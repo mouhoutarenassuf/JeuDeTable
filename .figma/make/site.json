@@ -1,0 +1,22 @@
+{
+  "title": "Jeu de table",
+  "description": "Jouez en famille, avec vos amis ou vos camarades de classe ! Découvrez un jeu de table gratuit, accessible sur mobile, pour passer une soirée incroyable. Rejoignez d'autres joueurs ou mettez en ligne votre propre création. Envie d'une soirée mémorable ? Jouez gratuitement à notre jeu de table en ligne depuis votre téléphone. Créez vos propres règles, publiez votre jeu et affrontez vos proches ou notre communauté !",
+  "language": "fr",
+  "icons": {
+    "icon": "/.figma/make/favicon.png"
+  },
+  "openGraph": {
+    "image": "/.figma/make/social-image.png"
+  },
+  "analytics": {
+    "googleAnalyticsId": "GTM-5QW5QLQC"
+  },
+  "customScripts": {
+    "headStart": "<!-- Google Tag Manager -->\n<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\nnew Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\nj=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n})(window,document,'script','dataLayer','GTM-5QW5QLQC');</script>\n<!-- End Google Tag Manager -->",
+    "headEnd": "<!-- Google Tag Manager (noscript) -->\n<noscript><iframe src=\"https://www.googletagmanager.com/ns.html?id=GTM-5QW5QLQC\"\nheight=\"0\" width=\"0\" style=\"display:none;visibility:hidden\"></iframe></noscript>\n<!-- End Google Tag Manager (noscript) -->"
+  },
+  "accessibility": {
+    "addBypassLinks": true,
+    "ignoreReducedMotion": false
+  }
+}
