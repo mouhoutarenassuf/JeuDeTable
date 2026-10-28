@@ -269,9 +269,11 @@ function MoonMark({ small = false }: { small?: boolean }) {
 function Header({
   onHome,
   onAdd,
+  onAuth, // 1. Ajoute onAuth ici
 }: {
   onHome: () => void;
   onAdd: () => void;
+  onAuth: () => void; // 2. Déclare son type ici
 }) {
   return (
     <header className="site-header">
@@ -279,14 +281,93 @@ function Header({
         <MoonMark small />
         <span>La Table</span>
       </button>
-      <button className="header-link" onClick={onAdd}>
-        <span className="plus">+</span>
-        Ajouter un jeu
-      </button>
+      
+      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <button className="header-link" onClick={onAdd}>
+          <span className="plus">+</span>
+          Ajouter un jeu
+        </button>
+        
+        {/* 3. Ajoute le bouton Connexion ici */}
+        <button className="primary-button" onClick={onAuth} style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem' }}>
+          Connexion
+        </button>
+      </div>
     </header>
   );
 }
+function AuthModal({ onClose }: { onClose: () => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
 
+  async function handleSignUp(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) setMessage(error.message);
+    else setMessage('Inscription réussie ! Vérifie tes e-mails.');
+    setLoading(false);
+  }
+
+  async function handleSignIn(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) setMessage(error.message);
+    else {
+      setMessage('Connexion réussie !');
+      setTimeout(onClose, 1000);
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1000
+    }}>
+      <div className="auth-card" style={{
+        background: '#1a1a1a', padding: '2rem', borderRadius: '12px',
+        width: '90%', maxWidth: '400px', border: '1px solid #333'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h3>Mon Compte</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+        </div>
+        <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <input
+            type="email"
+            placeholder="Ton e-mail"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            style={{ padding: '0.8rem', borderRadius: '6px', border: '1px solid #444', background: '#222', color: '#fff' }}
+          />
+          <input
+            type="password"
+            placeholder="Ton mot de passe"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            style={{ padding: '0.8rem', borderRadius: '6px', border: '1px solid #444', background: '#222', color: '#fff' }}
+          />
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button type="submit" className="primary-button" disabled={loading} style={{ flex: 1 }}>
+              Se connecter
+            </button>
+            <button type="button" className="secondary-button" onClick={handleSignUp} disabled={loading} style={{ flex: 1 }}>
+              S'inscrire
+            </button>
+          </div>
+        </form>
+        {message && <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#aaa', textAlign: 'center' }}>{message}</p>}
+      </div>
+    </div>
+  );
+}
 function Home({
   games,
   onOpen,
