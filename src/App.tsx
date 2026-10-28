@@ -2008,6 +2008,18 @@ export default function App() {
   const [games, setGames] = useState(initialGames);
   const [page, setPage] = useState<Page>({ name: "home" });
   const [showAuth, setShowAuth] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
   
   const currentGame =
     page.name === "game" ? games.find((game) => game.id === page.id) : undefined;
