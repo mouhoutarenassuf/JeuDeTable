@@ -269,11 +269,13 @@ function MoonMark({ small = false }: { small?: boolean }) {
 function Header({
   onHome,
   onAdd,
-  onAuth, // 1. Ajoute onAuth ici
+  onAuth,
+  user, // 1. Ajoute user ici
 }: {
   onHome: () => void;
   onAdd: () => void;
-  onAuth: () => void; // 2. Déclare son type ici
+  onAuth: () => void;
+  user?: any; // 2. Déclare son type ici
 }) {
   return (
     <header className="site-header">
@@ -288,10 +290,16 @@ function Header({
           Ajouter un jeu
         </button>
         
-        {/* 3. Ajoute le bouton Connexion ici */}
-        <button className="primary-button" onClick={onAuth} style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem' }}>
-          Connexion
-        </button>
+        {/* 3. Affichage conditionnel : initiale ou bouton Connexion */}
+        {user ? (
+          <button className="primary-button" onClick={onAuth} style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+            {user.email ? user.email[0].toUpperCase() : 'U'}
+          </button>
+        ) : (
+          <button className="primary-button" onClick={onAuth} style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem' }}>
+            Connexion
+          </button>
+        )}
       </div>
     </header>
   );
