@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./supabase";
 
-const LOKI_CODE = "CHANGE-MOI";
+const LOKI_CODE = "1234";
 const LAST_HOST_KEY = "la-table-last-host";
 const DEVICE_KEY = "la-table-device";
 const fallbackDeviceKey = Math.random().toString(36).slice(2);
