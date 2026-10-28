@@ -2007,7 +2007,8 @@ function Lobby({
 export default function App() {
   const [games, setGames] = useState(initialGames);
   const [page, setPage] = useState<Page>({ name: "home" });
-
+  const [showAuth, setShowAuth] = useState(false);
+  
   const currentGame =
     page.name === "game" ? games.find((game) => game.id === page.id) : undefined;
 
@@ -2088,9 +2089,11 @@ export default function App() {
   return (
     <div className="app-shell">
       <Header
-        onHome={() => setPage({ name: "home" })}
-        onAdd={() => setPage({ name: "add" })}
-      />
+  onHome={() => setPage({ name: "home" })}
+  onAdd={() => setPage({ name: "add" })}
+  onAuth={() => setShowAuth(true)}
+/>
+{showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
       <main>
         {page.name === "home" && (
           <Home
