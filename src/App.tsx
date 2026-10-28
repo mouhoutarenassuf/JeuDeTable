@@ -1,5 +1,43 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./supabase";
+
+const LOKI_CODE = "CHANGE-MOI";
+const LAST_HOST_KEY = "la-table-last-host";
+const DEVICE_KEY = "la-table-device";
+const fallbackDeviceKey = Math.random().toString(36).slice(2);
+
+function getDeviceKey() {
+  try {
+    let key = localStorage.getItem(DEVICE_KEY);
+    if (!key) {
+      key = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem(DEVICE_KEY, key);
+    }
+    return key;
+  } catch {
+    return fallbackDeviceKey;
+  }
+}
+
+function rememberHost(code: string) {
+  try {
+    localStorage.setItem(LAST_HOST_KEY, code);
+  } catch {}
+}
+
+function readLastHost(): string | null {
+  try {
+    return localStorage.getItem(LAST_HOST_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function clearLastHost() {
+  try {
+    localStorage.removeItem(LAST_HOST_KEY);
+  } catch {}
+}
 
 function toSession(row: any): Session {
   return {
@@ -7,6 +45,10 @@ function toSession(row: any): Session {
     game: row.game,
     players: row.players,
     assignments: row.assignments ?? undefined,
+    hostKey: row.host_key ?? null,
+    hostName: row.host_name ?? null,
+    progress: row.progress ?? null,
+    ended: Boolean(row.ended),
   };
 }
 
@@ -34,18 +76,49 @@ type Game = {
   characters: Character[];
 };
 
+type Progress = {
+  phase: "briefing" | "night" | "day";
+  round: number;
+  eliminated: string[];
+  completedSteps: string[];
+  history: string[];
+  awakeRole: string | null;
+  lovers: string[];
+  cupidSelection: string[];
+  seerTarget: string | null;
+  wolfVictim: string | null;
+  witchSave: boolean;
+  witchPoison: string | null;
+  witchLifeUsed: boolean;
+  witchPoisonUsed: boolean;
+  infected: string[];
+  alphaTarget: string | null;
+  alphaUsed: boolean;
+  counts: Record<number, number>;
+};
+
 type Session = {
   code: string;
   game: Game;
   players: string[];
   assignments?: Record<string, number>;
+  hostKey?: string | null;
+  hostName?: string | null;
+  progress?: Progress | null;
+  ended?: boolean;
 };
 
 type Page =
   | { name: "home" }
   | { name: "game"; id: number }
   | { name: "add" }
-  | { name: "lobby"; session: Session; host: boolean; player?: string };
+  | {
+      name: "lobby";
+      session: Session;
+      host: boolean;
+      player?: string;
+      admin?: boolean;
+    };
 
 const campNames: Record<Camp, string> = {
   village: "Village",
@@ -218,19 +291,31 @@ function Home({
   games,
   onOpen,
   onJoin,
+  onResume,
 }: {
   games: Game[];
   onOpen: (id: number) => void;
-  onJoin: (session: Session, player: string) => void;
+  onJoin: (session: Session, player: string, admin: boolean) => void;
+  onResume: (session: Session) => void;
 }) {
   const [code, setCode] = useState("");
   const [player, setPlayer] = useState("");
+  const [lokiCode, setLokiCode] = useState("");
   const [message, setMessage] = useState("");
+  const [resumeCode, setResumeCode] = useState<string | null>(() =>
+    readLastHost(),
+  );
+  const wantsAdmin = player.trim().toLowerCase() === "loki";
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (code.length !== 5) {
       setMessage("Le code doit contenir 5 caractères.");
+      return;
+    }
+    const pseudo = player.trim();
+    if (wantsAdmin && lokiCode !== LOKI_CODE) {
+      setMessage("Ce pseudo est réservé : code secret incorrect.");
       return;
     }
     const { data, error } = await supabase
@@ -242,7 +327,37 @@ function Home({
       setMessage("Cette partie n’existe pas.");
       return;
     }
-    onJoin(toSession(data), player.trim());
+    const found = toSession(data);
+    if (found.ended) {
+      setMessage("Cette partie est terminée.");
+      return;
+    }
+    onJoin(found, pseudo, wantsAdmin);
+  }
+
+  async function resume() {
+    if (!resumeCode) return;
+    const { data } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("code", resumeCode)
+      .maybeSingle();
+    const found = data ? toSession(data) : null;
+    if (!found || found.ended) {
+      clearLastHost();
+      setResumeCode(null);
+      setMessage("Cette partie n’existe plus.");
+      return;
+    }
+    if (found.hostKey !== getDeviceKey()) {
+      clearLastHost();
+      setResumeCode(null);
+      setMessage(
+        "Le rôle de narrateur a été transféré. Rejoignez la table avec votre pseudo.",
+      );
+      return;
+    }
+    onResume(found);
   }
 
   return (
@@ -301,11 +416,32 @@ function Home({
               required
             />
           </label>
+          {wantsAdmin && (
+            <label>
+              Code secret
+              <input
+                type="password"
+                placeholder="Code secret"
+                value={lokiCode}
+                onChange={(event) => setLokiCode(event.target.value)}
+              />
+            </label>
+          )}
           <button className="primary-button" type="submit">
             Rejoindre la table
           </button>
         </form>
         {message && <p className="form-message">{message}</p>}
+        {resumeCode && (
+          <div>
+            <p className="help">
+              Vous avez une partie en cours : {resumeCode}
+            </p>
+            <button className="secondary-button" onClick={resume}>
+              Reprendre ma partie
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="catalog">
@@ -705,36 +841,79 @@ function AddGame({
   );
 }
 
+type SessionPatch = {
+  players?: string[];
+  assignments?: Record<string, number> | null;
+  progress?: Progress | null;
+  ended?: boolean;
+  host_key?: string | null;
+  host_name?: string | null;
+};
+
 function Lobby({
   page,
   onHome,
-  onUpdate,
+  onPatch,
 }: {
   page: Extract<Page, { name: "lobby" }>;
   onHome: () => void;
-  onUpdate: (session: Session) => void;
+  onPatch: (patch: SessionPatch) => void;
 }) {
-  const { session, host, player } = page;
+  const { session, host, player, admin } = page;
+  const saved = session.progress;
   const [dealing, setDealing] = useState(false);
   const [revealed, setRevealed] = useState(false);
-  const [counts, setCounts] = useState<Record<number, number>>({});
-  const [phase, setPhase] = useState<"briefing" | "night" | "day">("briefing");
-  const [round, setRound] = useState(1);
-  const [eliminated, setEliminated] = useState<string[]>([]);
-  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
-  const [history, setHistory] = useState<string[]>([]);
-  const [awakeRole, setAwakeRole] = useState<string | null>(null);
-  const [lovers, setLovers] = useState<string[]>([]);
-  const [cupidSelection, setCupidSelection] = useState<string[]>([]);
-  const [seerTarget, setSeerTarget] = useState<string | null>(null);
-  const [wolfVictim, setWolfVictim] = useState<string | null>(null);
-  const [witchSave, setWitchSave] = useState(false);
-  const [witchPoison, setWitchPoison] = useState<string | null>(null);
-  const [witchLifeUsed, setWitchLifeUsed] = useState(false);
-  const [witchPoisonUsed, setWitchPoisonUsed] = useState(false);
-  const [infected, setInfected] = useState<string[]>([]);
-  const [alphaTarget, setAlphaTarget] = useState<string | null>(null);
-  const [alphaUsed, setAlphaUsed] = useState(false);
+  const [counts, setCounts] = useState<Record<number, number>>(
+    saved?.counts ?? {},
+  );
+  const [phase, setPhase] = useState<"briefing" | "night" | "day">(
+    saved?.phase ?? "briefing",
+  );
+  const [round, setRound] = useState(saved?.round ?? 1);
+  const [eliminated, setEliminated] = useState<string[]>(
+    saved?.eliminated ?? [],
+  );
+  const [completedSteps, setCompletedSteps] = useState<string[]>(
+    saved?.completedSteps ?? [],
+  );
+  const [history, setHistory] = useState<string[]>(saved?.history ?? []);
+  const [awakeRole, setAwakeRole] = useState<string | null>(
+    saved?.awakeRole ?? null,
+  );
+  const [lovers, setLovers] = useState<string[]>(saved?.lovers ?? []);
+  const [cupidSelection, setCupidSelection] = useState<string[]>(
+    saved?.cupidSelection ?? [],
+  );
+  const [seerTarget, setSeerTarget] = useState<string | null>(
+    saved?.seerTarget ?? null,
+  );
+  const [wolfVictim, setWolfVictim] = useState<string | null>(
+    saved?.wolfVictim ?? null,
+  );
+  const [witchSave, setWitchSave] = useState(saved?.witchSave ?? false);
+  const [witchPoison, setWitchPoison] = useState<string | null>(
+    saved?.witchPoison ?? null,
+  );
+  const [witchLifeUsed, setWitchLifeUsed] = useState(
+    saved?.witchLifeUsed ?? false,
+  );
+  const [witchPoisonUsed, setWitchPoisonUsed] = useState(
+    saved?.witchPoisonUsed ?? false,
+  );
+  const [infected, setInfected] = useState<string[]>(saved?.infected ?? []);
+  const [alphaTarget, setAlphaTarget] = useState<string | null>(
+    saved?.alphaTarget ?? null,
+  );
+  const [alphaUsed, setAlphaUsed] = useState(saved?.alphaUsed ?? false);
+
+  const deviceKey = getDeviceKey();
+  const isNarrator =
+    (host && session.hostKey === deviceKey) ||
+    (!!player && !!session.hostName && session.hostName === player);
+  const lostHost = host && !isNarrator;
+  const wasRemoved =
+    !isNarrator && !host && !!player && !session.players.includes(player);
+
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const distributed = Boolean(session.assignments);
   const assignedCharacter = useMemo(() => {
@@ -773,10 +952,134 @@ function Lobby({
           ? "loups"
           : null;
 
+  function buildProgress(): Progress {
+    return {
+      phase,
+      round,
+      eliminated,
+      completedSteps,
+      history,
+      awakeRole,
+      lovers,
+      cupidSelection,
+      seerTarget,
+      wolfVictim,
+      witchSave,
+      witchPoison,
+      witchLifeUsed,
+      witchPoisonUsed,
+      infected,
+      alphaTarget,
+      alphaUsed,
+      counts,
+    };
+  }
+
+  function applyProgress(p: Progress | null) {
+    setCounts(p?.counts ?? {});
+    setPhase(p?.phase ?? "briefing");
+    setRound(p?.round ?? 1);
+    setEliminated(p?.eliminated ?? []);
+    setCompletedSteps(p?.completedSteps ?? []);
+    setHistory(p?.history ?? []);
+    setAwakeRole(p?.awakeRole ?? null);
+    setLovers(p?.lovers ?? []);
+    setCupidSelection(p?.cupidSelection ?? []);
+    setSeerTarget(p?.seerTarget ?? null);
+    setWolfVictim(p?.wolfVictim ?? null);
+    setWitchSave(p?.witchSave ?? false);
+    setWitchPoison(p?.witchPoison ?? null);
+    setWitchLifeUsed(p?.witchLifeUsed ?? false);
+    setWitchPoisonUsed(p?.witchPoisonUsed ?? false);
+    setInfected(p?.infected ?? []);
+    setAlphaTarget(p?.alphaTarget ?? null);
+    setAlphaUsed(p?.alphaUsed ?? false);
+  }
+
+  const wasNarrator = useRef(isNarrator);
+  useEffect(() => {
+    if (isNarrator && !wasNarrator.current) {
+      applyProgress(session.progress ?? null);
+    }
+    wasNarrator.current = isNarrator;
+  }, [isNarrator]);
+
+  useEffect(() => {
+    if (!isNarrator || !distributed) return;
+    const timer = window.setTimeout(() => {
+      onPatch({ progress: buildProgress() });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [
+    isNarrator,
+    distributed,
+    phase,
+    round,
+    eliminated,
+    completedSteps,
+    history,
+    awakeRole,
+    lovers,
+    cupidSelection,
+    seerTarget,
+    wolfVictim,
+    witchSave,
+    witchPoison,
+    witchLifeUsed,
+    witchPoisonUsed,
+    infected,
+    alphaTarget,
+    alphaUsed,
+    counts,
+  ]);
+
   function addDemoPlayer() {
     const names = ["Camille", "Noa", "Lou", "Sacha", "Charlie"];
     const next = names.find((name) => !session.players.includes(name));
-    if (next) onUpdate({ ...session, players: [...session.players, next] });
+    if (next) onPatch({ players: [...session.players, next] });
+  }
+
+  function removePlayer(name: string) {
+    if (!window.confirm(`Retirer ${name} de la partie ?`)) return;
+    const players = session.players.filter((item) => item !== name);
+    if (session.assignments) {
+      const { [name]: _removed, ...rest } = session.assignments;
+      onPatch({ players, assignments: rest });
+    } else {
+      onPatch({ players });
+    }
+    setEliminated((items) => items.filter((item) => item !== name));
+    setLovers((items) => items.filter((item) => item !== name));
+    setInfected((items) => items.filter((item) => item !== name));
+    setCupidSelection((items) => items.filter((item) => item !== name));
+  }
+
+  function transferHost(name: string) {
+    if (!window.confirm(`Passer le rôle de narrateur à ${name} ?`)) return;
+    const players = session.players.filter((item) => item !== name);
+    let assignments: Record<string, number> | null = null;
+    if (session.assignments) {
+      const { [name]: _gone, ...rest } = session.assignments;
+      assignments = rest;
+    }
+    onPatch({
+      players,
+      assignments,
+      host_name: name,
+      host_key: null,
+      progress: {
+        ...buildProgress(),
+        eliminated: eliminated.filter((item) => item !== name),
+      },
+    });
+    clearLastHost();
+  }
+
+  function endGame() {
+    if (!window.confirm("Terminer la partie pour tout le monde ?")) return;
+    onPatch({ ended: true });
+    clearLastHost();
+    onHome();
   }
 
   function makeAutomaticDeck() {
@@ -844,7 +1147,7 @@ function Lobby({
     setCounts(nextCounts);
     setDealing(true);
     window.setTimeout(() => {
-      onUpdate({ ...session, assignments });
+      onPatch({ assignments });
       setDealing(false);
       setPhase("briefing");
       setRound(1);
@@ -867,25 +1170,8 @@ function Lobby({
   }
 
   function resetGame() {
-    const { assignments: _assignments, ...waitingSession } = session;
-    onUpdate(waitingSession);
-    setPhase("briefing");
-    setRound(1);
-    setEliminated([]);
-    setCompletedSteps([]);
-    setHistory([]);
-    setAwakeRole(null);
-    setLovers([]);
-    setCupidSelection([]);
-    setSeerTarget(null);
-    setWolfVictim(null);
-    setWitchSave(false);
-    setWitchPoison(null);
-    setWitchLifeUsed(false);
-    setWitchPoisonUsed(false);
-    setInfected([]);
-    setAlphaTarget(null);
-    setAlphaUsed(false);
+    onPatch({ assignments: null, progress: null });
+    applyProgress(null);
   }
 
   function resetNightActions() {
@@ -1049,14 +1335,62 @@ function Lobby({
           "Tout le monde connaît les conditions de victoire",
         ]
       : [
-            "Annoncer les événements de la nuit",
-            "Laisser le village débattre",
-            "Organiser le vote",
-            "Marquer le joueur éliminé ci-dessous",
-          ];
+          "Annoncer les événements de la nuit",
+          "Laisser le village débattre",
+          "Organiser le vote",
+          "Marquer le joueur éliminé ci-dessous",
+        ];
   const seerCharacter = assignedPlayers.find(
     ({ name }) => name === seerTarget,
   )?.character;
+
+  if (session.ended) {
+    return (
+      <section className="lobby-page">
+        <div className="waiting-card">
+          <MoonMark />
+          <h2>La partie est terminée</h2>
+          <p>Le narrateur a mis fin à la partie.</p>
+          <button className="primary-button" onClick={onHome}>
+            Retour à l’accueil
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (lostHost) {
+    return (
+      <section className="lobby-page">
+        <div className="waiting-card">
+          <MoonMark />
+          <h2>Vous n’êtes plus narrateur</h2>
+          <p>
+            Le rôle de narrateur a été transmis à {session.hostName}. Vous
+            pouvez rejoindre la table avec un pseudo.
+          </p>
+          <button className="primary-button" onClick={onHome}>
+            Retour à l’accueil
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (wasRemoved) {
+    return (
+      <section className="lobby-page">
+        <div className="waiting-card">
+          <MoonMark />
+          <h2>Vous avez été retiré de la partie</h2>
+          <p>Le narrateur vous a retiré de la table.</p>
+          <button className="primary-button" onClick={onHome}>
+            Retour à l’accueil
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="lobby-page">
@@ -1068,7 +1402,7 @@ function Lobby({
         </div>
         <MoonMark />
       </div>
-      {host ? (
+      {isNarrator ? (
         <>
           <div className="lobby-section">
             <div className="lobby-title">
@@ -1082,6 +1416,12 @@ function Lobby({
                     <span className="avatar">{name[0]}</span>
                     {name}
                     <small>Joueur {index + 1}</small>
+                    <button
+                      className="text-button"
+                      onClick={() => removePlayer(name)}
+                    >
+                      Retirer
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -1161,8 +1501,8 @@ function Lobby({
                 <div>
                   <strong>Les cartes sont distribuées</strong>
                   <p>
-                    En mode démonstration, le narrateur voit toutes les cartes.
-                    En ligne, chaque joueur ne verra que la sienne.
+                    Le narrateur voit toutes les cartes. Chaque joueur ne
+                    voit que la sienne.
                   </p>
                 </div>
               </div>
@@ -1307,7 +1647,7 @@ function Lobby({
                         {seerTarget && seerCharacter && (
                           <div className="role-result">
                             {seerTarget} est <strong>{seerCharacter.name}</strong>
-                                                      </div>
+                          </div>
                         )}
                         <button
                           className="secondary-button role-confirm"
@@ -1490,6 +1830,32 @@ function Lobby({
               </button>
             </div>
           )}
+          <div className="lobby-section">
+            <div className="lobby-title">
+              <h2>Gérer la partie</h2>
+            </div>
+            {session.players.length > 0 && (
+              <>
+                <p className="composition-help">
+                  Passer le rôle de narrateur à un joueur :
+                </p>
+                <div className="player-picker">
+                  {session.players.map((name) => (
+                    <button key={name} onClick={() => transferHost(name)}>
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            <button className="secondary-button reset-button" onClick={endGame}>
+              Terminer la partie pour tout le monde
+            </button>
+            <p className="help">
+              Si vous quittez la page, vous pourrez revenir avec « Reprendre ma
+              partie » sur l’accueil, depuis le même appareil.
+            </p>
+          </div>
         </>
       ) : (
         <div className="player-view">
@@ -1518,6 +1884,25 @@ function Lobby({
               <MoonMark />
               <h2>Bienvenue, {player}</h2>
               <p>Le narrateur prépare les cartes. La partie va bientôt commencer.</p>
+            </div>
+          )}
+          {admin && distributed && (
+            <div className="lobby-section">
+              <div className="lobby-title">
+                <h2>Vue de Loki</h2>
+                <span>{session.players.length} joueurs</span>
+              </div>
+              <ul className="player-list">
+                {assignedPlayers.map(({ name, character }) => (
+                  <li key={name}>
+                    <span className="avatar">{name[0]}</span>
+                    {name}
+                    <small>
+                      {character.name} · {campNames[character.camp]}
+                    </small>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
@@ -1551,31 +1936,42 @@ export default function App() {
       { length: 5 },
       () => alphabet[Math.floor(Math.random() * alphabet.length)],
     ).join("");
+    const hostKey = getDeviceKey();
     const { error } = await supabase
       .from("sessions")
-      .insert({ code, game, players: [] });
+      .insert({ code, game, players: [], host_key: hostKey });
     if (error) {
       alert("Impossible de créer la salle : " + error.message);
       return;
     }
+    rememberHost(code);
     setPage({
       name: "lobby",
-      session: { code, game, players: [] },
+      session: { code, game, players: [], hostKey },
       host: true,
     });
   }
 
-  function updateSession(updated: Session) {
-    setPage((current) =>
-      current.name === "lobby" ? { ...current, session: updated } : current,
-    );
+  function patchSession(code: string, patch: SessionPatch) {
+    setPage((current) => {
+      if (current.name !== "lobby" || current.session.code !== code) {
+        return current;
+      }
+      const next = { ...current.session };
+      if (patch.players !== undefined) next.players = patch.players;
+      if (patch.assignments !== undefined) {
+        next.assignments = patch.assignments ?? undefined;
+      }
+      if (patch.progress !== undefined) next.progress = patch.progress;
+      if (patch.ended !== undefined) next.ended = patch.ended;
+      if (patch.host_key !== undefined) next.hostKey = patch.host_key;
+      if (patch.host_name !== undefined) next.hostName = patch.host_name;
+      return { ...current, session: next };
+    });
     supabase
       .from("sessions")
-      .update({
-        players: updated.players,
-        assignments: updated.assignments ?? null,
-      })
-      .eq("code", updated.code)
+      .update(patch)
+      .eq("code", code)
       .then(({ error }) => {
         if (error) console.error(error);
       });
@@ -1619,16 +2015,30 @@ export default function App() {
           <Home
             games={games}
             onOpen={(id) => setPage({ name: "game", id })}
-            onJoin={async (session, player) => {
+            onResume={(session) => {
+              rememberHost(session.code);
+              setPage({ name: "lobby", session, host: true });
+            }}
+            onJoin={async (session, pseudo, admin) => {
+              if (session.hostName && session.hostName === pseudo) {
+                setPage({
+                  name: "lobby",
+                  session,
+                  host: false,
+                  player: pseudo,
+                  admin,
+                });
+                return;
+              }
               const { data } = await supabase
                 .from("sessions")
                 .select("players")
                 .eq("code", session.code)
                 .maybeSingle();
               const current: string[] = data?.players ?? session.players;
-              const players = current.includes(player)
+              const players = current.includes(pseudo)
                 ? current
-                : [...current, player];
+                : [...current, pseudo];
               await supabase
                 .from("sessions")
                 .update({ players })
@@ -1637,7 +2047,8 @@ export default function App() {
                 name: "lobby",
                 session: { ...session, players },
                 host: false,
-                player,
+                player: pseudo,
+                admin,
               });
             }}
           />
@@ -1662,7 +2073,7 @@ export default function App() {
           <Lobby
             page={page}
             onHome={() => setPage({ name: "home" })}
-            onUpdate={updateSession}
+            onPatch={(patch) => patchSession(page.session.code, patch)}
           />
         )}
       </main>
