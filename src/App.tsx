@@ -1,4 +1,14 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { supabase } from "./supabase";
+
+function toSession(row: any): Session {
+  return {
+    code: row.code,
+    game: row.game,
+    players: row.players,
+    assignments: row.assignments ?? undefined,
+  };
+}
 
 type Camp = "village" | "loups" | "solitaire" | "autre";
 type GameType = "roles" | "cartes" | "plateau" | "ambiance" | "autre";
@@ -206,12 +216,10 @@ function Header({
 
 function Home({
   games,
-  sessions,
   onOpen,
   onJoin,
 }: {
   games: Game[];
-  sessions: Session[];
   onOpen: (id: number) => void;
   onJoin: (session: Session, player: string) => void;
 }) {
@@ -219,18 +227,22 @@ function Home({
   const [player, setPlayer] = useState("");
   const [message, setMessage] = useState("");
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (code.length !== 5) {
       setMessage("Le code doit contenir 5 caractères.");
       return;
     }
-    const session = sessions.find((item) => item.code === code);
-    if (!session) {
-      setMessage("Cette partie n’existe pas encore dans cette démo.");
+    const { data, error } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("code", code)
+      .maybeSingle();
+    if (error || !data) {
+      setMessage("Cette partie n’existe pas.");
       return;
     }
-    onJoin(session, player.trim());
+    onJoin(toSession(data), player.trim());
   }
 
   return (
@@ -1295,7 +1307,7 @@ function Lobby({
                         {seerTarget && seerCharacter && (
                           <div className="role-result">
                             {seerTarget} est <strong>{seerCharacter.name}</strong>
-                          </div>
+                                                      </div>
                         )}
                         <button
                           className="secondary-button role-confirm"
@@ -1528,33 +1540,73 @@ function Lobby({
 
 export default function App() {
   const [games, setGames] = useState(initialGames);
-  const [sessions, setSessions] = useState<Session[]>([]);
   const [page, setPage] = useState<Page>({ name: "home" });
 
   const currentGame =
     page.name === "game" ? games.find((game) => game.id === page.id) : undefined;
 
-  function startSession(game: Game) {
+  async function startSession(game: Game) {
     const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     const code = Array.from(
       { length: 5 },
       () => alphabet[Math.floor(Math.random() * alphabet.length)],
     ).join("");
-    const session = { code, game, players: [] };
-    setSessions((items) => [...items, session]);
-    setPage({ name: "lobby", session, host: true });
+    const { error } = await supabase
+      .from("sessions")
+      .insert({ code, game, players: [] });
+    if (error) {
+      alert("Impossible de créer la salle : " + error.message);
+      return;
+    }
+    setPage({
+      name: "lobby",
+      session: { code, game, players: [] },
+      host: true,
+    });
   }
 
   function updateSession(updated: Session) {
-    setSessions((items) =>
-      items.map((session) =>
-        session.code === updated.code ? updated : session,
-      ),
-    );
     setPage((current) =>
       current.name === "lobby" ? { ...current, session: updated } : current,
     );
+    supabase
+      .from("sessions")
+      .update({
+        players: updated.players,
+        assignments: updated.assignments ?? null,
+      })
+      .eq("code", updated.code)
+      .then(({ error }) => {
+        if (error) console.error(error);
+      });
   }
+
+  const lobbyCode = page.name === "lobby" ? page.session.code : null;
+  useEffect(() => {
+    if (!lobbyCode) return;
+    const channel = supabase
+      .channel("session-" + lobbyCode)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "sessions",
+          filter: `code=eq.${lobbyCode}`,
+        },
+        (payload) => {
+          setPage((current) =>
+            current.name === "lobby"
+              ? { ...current, session: toSession(payload.new) }
+              : current,
+          );
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [lobbyCode]);
 
   return (
     <div className="app-shell">
@@ -1566,19 +1618,27 @@ export default function App() {
         {page.name === "home" && (
           <Home
             games={games}
-            sessions={sessions}
             onOpen={(id) => setPage({ name: "game", id })}
-            onJoin={(session, player) => {
-              const updated = {
-                ...session,
-                players: session.players.includes(player)
-                  ? session.players
-                  : [...session.players, player],
-              };
-              setSessions((items) =>
-                items.map((item) => (item.code === session.code ? updated : item)),
-              );
-              setPage({ name: "lobby", session: updated, host: false, player });
+            onJoin={async (session, player) => {
+              const { data } = await supabase
+                .from("sessions")
+                .select("players")
+                .eq("code", session.code)
+                .maybeSingle();
+              const current: string[] = data?.players ?? session.players;
+              const players = current.includes(player)
+                ? current
+                : [...current, player];
+              await supabase
+                .from("sessions")
+                .update({ players })
+                .eq("code", session.code);
+              setPage({
+                name: "lobby",
+                session: { ...session, players },
+                host: false,
+                player,
+              });
             }}
           />
         )}
