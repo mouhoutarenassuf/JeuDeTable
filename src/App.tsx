@@ -2112,6 +2112,7 @@ export default function App() {
   onHome={() => setPage({ name: "home" })}
   onAdd={() => setPage({ name: "add" })}
   onAuth={() => setShowAuth(true)}
+    user={user}     
 />
 {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
       <main>
