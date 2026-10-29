@@ -17,20 +17,7 @@
   background: var(--ink);
   color: var(--paper);
 }
-<body>
-  <a class="skip" href="#contenu">Aller au contenu</a>
-  <header class="site-header">
-    <div class="container header-row">
-      <a class="brand" href="index.html"><span class="brand-icon" aria-hidden="true">≈</span>LagonPass</a>
-      <nav aria-label="Navigation principale">
-      <a href="index.html" aria-current="page">Accueil</a>
-      <a href="activites.html">Activités</a>
-      <a href="inscription.html" class="nav-action">S’inscrire</a>
-      <a href="contact.html">Contact</a>
-      <a href="equipe.html">Équipe</a>
-      </nav>
-    </div>
-  </header>
+
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; background: var(--ink); }
 button, input, textarea, select { font: inherit; }
