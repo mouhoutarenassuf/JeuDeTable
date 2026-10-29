@@ -8,6 +8,11 @@
   --border-color: #e5e5df;
   --primary: #4f46e5;
   --primary-hover: #4338ca;
+  --cream: #fcfbf7;
+  --ink: #1a1a1a;
+  --ink-soft: #262626;
+  --line: #e5e5df;
+  --muted: #6b7280;
 }
 
 body {
@@ -19,7 +24,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Styles globaux du header et de la mise en page */
+/* Styles du Header et des actions */
 .site-header {
   display: flex;
   justify-content: space-between;
@@ -106,3 +111,119 @@ body {
   color: #111827;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
+
+/* Cartes secrètes */
+.secret-card { 
+  position: relative; 
+  width: 290px; 
+  aspect-ratio: 2/3; 
+  padding: 0; 
+  background: transparent; 
+  border: 0; 
+  cursor: pointer; 
+}
+
+.secret-back, .secret-front { 
+  position: absolute; 
+  inset: 0; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  justify-content: center; 
+  gap: 25px; 
+  padding: 30px; 
+  border: 1px solid var(--cream); 
+  background: var(--ink-soft); 
+}
+
+.secret-back .moon { 
+  width: 85px; 
+  height: 85px; 
+}
+
+.secret-back .moon::after { 
+  width: 84px; 
+  height: 84px; 
+  left: 27px; 
+  top: -10px; 
+}
+
+.secret-front { 
+  visibility: hidden; 
+  background: var(--cream); 
+  color: var(--ink); 
+}
+
+.secret-front strong { 
+  font: 700 30px "Playfair Display", serif; 
+}
+
+.secret-front small { 
+  line-height: 1.6; 
+}
+
+.secret-card.is-revealed .secret-front { 
+  visibility: visible; 
+}
+
+.secret-card.is-revealed .secret-back { 
+  visibility: hidden; 
+}
+
+.lobby-exit { 
+  margin-top: 25px; 
+}
+ 
+footer { 
+  max-width: 1180px; 
+  margin: auto; 
+  padding: 35px 32px; 
+  border-top: 1px solid var(--line); 
+  display: flex; 
+  justify-content: space-between; 
+  color: var(--muted); 
+  font-size: 12px; 
+}
+
+footer span { 
+  color: var(--cream); 
+  font: 600 18px "Playfair Display", serif; 
+}
+
+footer p { 
+  margin: 0; 
+}
+ 
+@media (max-width: 800px) {
+  .site-header, main { padding-left: 20px; padding-right: 20px; }
+  .header-link { font-size: 0; }
+  .header-link .plus { font-size: 24px; }
+  .hero { grid-template-columns: 1fr; }
+  .hero-copy { padding-bottom: 20px; }
+  .hero-art { height: 230px; }
+  .hero-art .moon { right: 75px; }
+  .join-card { padding: 28px 22px; }
+  .join-form { grid-template-columns: 1fr; }
+  .game-grid, .characters-grid { grid-template-columns: 1fr; }
+  .game-card { grid-template-columns: 130px 1fr; }
+  .detail-hero { grid-template-columns: 1fr; padding-bottom: 50px; }
+  .detail-moon { display: none; }
+  .characters-grid { gap: 10px; }
+  .form-section { grid-template-columns: 35px 1fr; }
+  .two-columns { grid-template-columns: 1fr; }
+  .three-columns { grid-template-columns: 1fr; }
+  .type-picker > div { grid-template-columns: repeat(2, 1fr); }
+  .rules-layout { grid-template-columns: 1fr; }
+  .lobby-page { margin-top: 25px; }
+  .lobby-header { padding: 25px; }
+  .lobby-header .moon { display: none; }
+  .dealt-grid { grid-template-columns: repeat(2, 1fr); }
+  footer { margin: 0 20px; padding-left: 0; padding-right: 0; }
+}
+ 
+@media (max-width: 480px) {
+  h1 { font-size: 48px; }
+  .hero { min-height: auto; }
+  .hero-copy { padding-top: 55px; }
+  .game-card { grid-template-columns: 1fr; }
+  .game-visual {
