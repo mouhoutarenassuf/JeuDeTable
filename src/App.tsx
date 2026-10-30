@@ -1,5 +1,30 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./supabase";
+import lightCss from "./theme-light.css?inline";
+import darkCss from "./theme-dark.css?inline";
+
+type Theme = "light" | "dark";
+const THEME_KEY = "la-table-theme";
+const themeStyle = document.createElement("style");
+document.head.appendChild(themeStyle);
+
+function applyTheme(theme: Theme) {
+  themeStyle.textContent = theme === "dark" ? darkCss : lightCss;
+  document.documentElement.setAttribute("data-theme", theme);
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch {}
+}
+
+function readTheme(): Theme {
+  try {
+    return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+  } catch {
+    return "light";
+  }
+}
+
+applyTheme(readTheme());
 
 const LOKI_CODE = "1234";
 const LAST_HOST_KEY = "la-table-last-host";
