@@ -2182,7 +2182,7 @@ export default function App() {
      <Header
   onHome={() => setPage({ name: "home" })}
   onAdd={() => setPage({ name: "add" })}
-  onAuth={...}
+   onAuth={() => setShowAuth(true)}
   user={user}
   theme={theme}
  onTheme={changeTheme}
