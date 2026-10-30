@@ -137,6 +137,7 @@ type Page =
   | { name: "home" }
   | { name: "game"; id: number }
   | { name: "add" }
+  | { name: "auth" }
   | {
       name: "lobby";
       session: Session;
@@ -2078,6 +2079,188 @@ function Lobby({
   );
 }
 
+function AuthPage({
+  user,
+  onBack,
+}: {
+  user?: any;
+  onBack: () => void;
+}) {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [message, setMessage] = useState("");
+  const [info, setInfo] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  function explain(text: string) {
+    const t = text.toLowerCase();
+    if (t.includes("invalid login")) return "Email ou mot de passe incorrect.";
+    if (t.includes("already registered"))
+      return "Cet email est déjà utilisé. Essayez de vous connecter.";
+    if (t.includes("password should be at least"))
+      return "Le mot de passe doit contenir au moins 6 caractères.";
+    if (t.includes("email not confirmed"))
+      return "Confirmez d’abord votre email (regardez votre boîte mail).";
+    if (t.includes("invalid email") || t.includes("unable to validate email"))
+      return "Cette adresse email n’est pas valide.";
+    if (t.includes("rate limit"))
+      return "Trop d’essais. Réessayez dans quelques minutes.";
+    return "Une erreur est survenue : " + text;
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setMessage("");
+    setInfo("");
+    setLoading(true);
+    if (mode === "login") {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      setLoading(false);
+      if (error) {
+        setMessage(explain(error.message));
+        return;
+      }
+      onBack();
+      return;
+    }
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: { data: { username: username.trim() } },
+    });
+    setLoading(false);
+    if (error) {
+      setMessage(explain(error.message));
+      return;
+    }
+    if (data.session) {
+      onBack();
+      return;
+    }
+    setInfo(
+      "Compte créé ! Vérifiez votre boîte mail pour confirmer votre adresse, puis connectez-vous.",
+    );
+    setMode("login");
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
+    onBack();
+  }
+
+  if (user) {
+    const name = user.user_metadata?.username || user.email;
+    return (
+      <section className="form-page" style={{ maxWidth: 520 }}>
+        <button className="back-link" onClick={onBack}>
+          ← Retour
+        </button>
+        <p className="eyebrow">Mon compte</p>
+        <h1 style={{ fontSize: 44 }}>Bonjour, {name}</h1>
+        <p className="detail-description">
+          Vous êtes connecté avec l’adresse {user.email}.
+        </p>
+        <button className="secondary-button" onClick={logout}>
+          Se déconnecter
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="form-page" style={{ maxWidth: 520 }}>
+      <button className="back-link" onClick={onBack}>
+        ← Retour
+      </button>
+      <p className="eyebrow">Mon compte</p>
+      <h1 style={{ fontSize: 44 }}>
+        {mode === "login" ? "Connexion" : "Créer un compte"}
+      </h1>
+      <p className="detail-description">
+        {mode === "login"
+          ? "Retrouvez vos parties et vos jeux."
+          : "Un compte gratuit pour garder vos parties."}
+      </p>
+      <div className="join-card" style={{ margin: "28px 0" }}>
+        <form onSubmit={submit} style={{ display: "grid", gap: 18 }}>
+          {mode === "signup" && (
+            <label>
+              Pseudo
+              <input
+                value={username}
+                maxLength={20}
+                placeholder="Comment vous appeler ?"
+                onChange={(event) => setUsername(event.target.value)}
+                required
+              />
+            </label>
+          )}
+          <label>
+            Email
+            <input
+              type="email"
+              value={email}
+              placeholder="vous@exemple.com"
+              autoComplete="email"
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Mot de passe
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              placeholder="6 caractères minimum"
+              autoComplete={
+                mode === "login" ? "current-password" : "new-password"
+              }
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              minLength={6}
+            />
+          </label>
+          <button
+            type="button"
+            className="text-button"
+            style={{ justifySelf: "start", padding: 0 }}
+            onClick={() => setShowPassword((current) => !current)}
+          >
+            {showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+          </button>
+          {message && <p className="form-message" style={{ margin: 0 }}>{message}</p>}
+          {info && <p className="help" style={{ margin: 0 }}>{info}</p>}
+          <button className="primary-button" type="submit" disabled={loading}>
+            {loading
+              ? "Un instant…"
+              : mode === "login"
+                ? "Se connecter"
+                : "Créer mon compte"}
+          </button>
+        </form>
+      </div>
+      <button
+        className="text-button"
+        onClick={() => {
+          setMode(mode === "login" ? "signup" : "login");
+          setMessage("");
+          setInfo("");
+        }}
+      >
+        {mode === "login"
+          ? "Pas encore de compte ? Créer un compte"
+          : "Déjà un compte ? Se connecter"}
+      </button>
+    </section>
+  );
+}
+
 export default function App() {
   const [games, setGames] = useState(initialGames);
   const [page, setPage] = useState<Page>({ name: "home" });
@@ -2182,12 +2365,11 @@ export default function App() {
      <Header
   onHome={() => setPage({ name: "home" })}
   onAdd={() => setPage({ name: "add" })}
-   onAuth={() => setShowAuth(true)}
+   onAuth={() => setPage({ name: "auth" })}
   user={user}
   theme={theme}
  onTheme={changeTheme}
 />
-{showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
       <main>
         {page.name === "home" && (
           <Home
@@ -2237,6 +2419,9 @@ export default function App() {
             onBack={() => setPage({ name: "home" })}
             onStart={() => startSession(currentGame)}
           />
+        )}
+                {page.name === "auth" && (
+          <AuthPage user={user} onBack={() => setPage({ name: "home" })} />
         )}
         {page.name === "add" && (
           <AddGame
