@@ -295,12 +295,16 @@ function Header({
   onHome,
   onAdd,
   onAuth,
-  user, // 1. Ajoute user ici
+  user,
+  theme,
+  onTheme,
 }: {
   onHome: () => void;
   onAdd: () => void;
   onAuth: () => void;
-  user?: any; // 2. Déclare son type ici
+  user?: any;
+  theme: Theme;
+  onTheme: (theme: Theme) => void;
 }) {
   return (
     <header className="site-header">
@@ -308,20 +312,57 @@ function Header({
         <MoonMark small />
         <span>La Table</span>
       </button>
-      
-      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-        <button className="header-link" onClick={onAdd}>
-          <span className="plus">+</span>
-          Ajouter un jeu
+      <div className="header-actions">
+        <button className="add-pill" onClick={onAdd} aria-label="Ajouter un jeu">
+          <span className="add-pill-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              <path d="M12 7v6M9 10h6" />
+            </svg>
+          </span>
+          <span className="add-pill-text">
+            <strong>Ajouter un jeu</strong>
+            <small>Créer une fiche</small>
+          </span>
         </button>
-        
-        {/* 3. Affichage conditionnel : initiale ou bouton Connexion */}
+        <div className="theme-toggle" role="group" aria-label="Choisir le design">
+          <button
+            className={theme === "light" ? "is-active" : ""}
+            onClick={() => onTheme("light")}
+            aria-label="Nouveau design (clair)"
+            title="Nouveau design (clair)"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+            </svg>
+          </button>
+          <button
+            className={theme === "dark" ? "is-active" : ""}
+            onClick={() => onTheme("dark")}
+            aria-label="Ancien design (sombre)"
+            title="Ancien design (sombre)"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          </button>
+        </div>
         {user ? (
-          <button className="primary-button" onClick={onAuth} style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem', cursor: 'pointer' }}>
-            {user.email ? user.email[0].toUpperCase() : 'U'}
+          <button
+            className="primary-button"
+            onClick={onAuth}
+            style={{ width: "42px", height: "42px", minHeight: "42px", padding: 0, borderRadius: "999px", fontSize: "0.9rem", cursor: "pointer" }}
+          >
+            {user.email ? user.email[0].toUpperCase() : "U"}
           </button>
         ) : (
-          <button className="primary-button" onClick={onAuth} style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem' }}>
+          <button
+            className="primary-button"
+            onClick={onAuth}
+            style={{ minHeight: "42px", padding: "0 1rem", fontSize: "0.9rem", cursor: "pointer" }}
+          >
             Connexion
           </button>
         )}
@@ -2040,6 +2081,11 @@ function Lobby({
 export default function App() {
   const [games, setGames] = useState(initialGames);
   const [page, setPage] = useState<Page>({ name: "home" });
+    const [theme, setTheme] = useState<Theme>(readTheme);
+  function changeTheme(next: Theme) {
+    applyTheme(next);
+    setTheme(next);
+  }
   const [showAuth, setShowAuth] = useState(false);
   const [user, setUser] = useState<any>(null);
   useEffect(() => {
@@ -2133,11 +2179,13 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Header
+     <Header
   onHome={() => setPage({ name: "home" })}
   onAdd={() => setPage({ name: "add" })}
-  onAuth={() => setShowAuth(true)}
-    user={user}     
+  onAuth={...}
+  user={user}
+  theme={theme}
+ onTheme={changeTheme}
 />
 {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
       <main>
