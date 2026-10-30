@@ -77,6 +77,36 @@ function toSession(row: any): Session {
   };
 }
 
+const LOBBY_KEY = "la-table-lobby";
+
+type SavedLobby = {
+  code: string;
+  host: boolean;
+  player?: string;
+  admin?: boolean;
+};
+
+function saveLobby(value: SavedLobby) {
+  try {
+    localStorage.setItem(LOBBY_KEY, JSON.stringify(value));
+  } catch {}
+}
+
+function readSavedLobby(): SavedLobby | null {
+  try {
+    const raw = localStorage.getItem(LOBBY_KEY);
+    return raw ? (JSON.parse(raw) as SavedLobby) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearSavedLobby() {
+  try {
+    localStorage.removeItem(LOBBY_KEY);
+  } catch {}
+}
+
 type Camp = "village" | "loups" | "solitaire" | "autre";
 type GameType = "roles" | "cartes" | "plateau" | "ambiance" | "autre";
 
@@ -2282,6 +2312,34 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+    useEffect(() => {
+    const saved = readSavedLobby();
+    if (!saved) return;
+    supabase
+      .from("sessions")
+      .select("*")
+      .eq("code", saved.code)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) {
+          clearSavedLobby();
+          return;
+        }
+        const found = toSession(data);
+        if (found.ended) {
+          clearSavedLobby();
+          return;
+        }
+        setPage({
+          name: "lobby",
+          session: found,
+          host: saved.host,
+          player: saved.player,
+          admin: saved.admin,
+        });
+      });
+  }, []);
   
   const currentGame =
     page.name === "game" ? games.find((game) => game.id === page.id) : undefined;
@@ -2307,6 +2365,8 @@ export default function App() {
       host: true,
     });
   }
+
+  
 
   function patchSession(code: string, patch: SessionPatch) {
     setPage((current) => {
@@ -2360,10 +2420,24 @@ export default function App() {
     };
   }, [lobbyCode]);
 
+    useEffect(() => {
+    if (page.name === "lobby") {
+      saveLobby({
+        code: page.session.code,
+        host: page.host,
+        player: page.player,
+        admin: page.admin,
+      });
+    }
+  }, [lobbyCode]);
+
   return (
     <div className="app-shell">
      <Header
-  onHome={() => setPage({ name: "home" })}
+          onHome={() => {
+          clearSavedLobby();
+          setPage({ name: "home" });
+        }}
   onAdd={() => setPage({ name: "add" })}
    onAuth={() => setPage({ name: "auth" })}
   user={user}
@@ -2435,7 +2509,10 @@ export default function App() {
         {page.name === "lobby" && (
           <Lobby
             page={page}
-            onHome={() => setPage({ name: "home" })}
+                       onHome={() => {
+              clearSavedLobby();
+              setPage({ name: "home" });
+            }}
             onPatch={(patch) => patchSession(page.session.code, patch)}
           />
         )}
