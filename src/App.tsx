@@ -2406,12 +2406,30 @@ export default function App() {
           table: "sessions",
           filter: `code=eq.${lobbyCode}`,
         },
-        (payload) => {
-          setPage((current) =>
-            current.name === "lobby"
-              ? { ...current, session: toSession(payload.new) }
-              : current,
-          );
+                (payload) => {
+          setPage((current) => {
+            if (current.name !== "lobby") return current;
+            const row: any = payload.new;
+            const prev = current.session;
+            const next: Session = {
+              code: prev.code,
+              game: row.game ?? prev.game,
+              players: row.players ?? prev.players,
+              assignments:
+                row.assignments !== undefined
+                  ? (row.assignments ?? undefined)
+                  : prev.assignments,
+              hostKey:
+                row.host_key !== undefined ? row.host_key : prev.hostKey,
+              hostName:
+                row.host_name !== undefined ? row.host_name : prev.hostName,
+              progress:
+                row.progress !== undefined ? row.progress : prev.progress,
+              ended:
+                row.ended !== undefined ? Boolean(row.ended) : prev.ended,
+            };
+            return { ...current, session: next };
+          });
         },
       )
       .subscribe();
