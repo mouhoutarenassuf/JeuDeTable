@@ -1100,6 +1100,17 @@ function Lobby({
   const wasRemoved =
     !isNarrator && !host && !!player && !session.players.includes(player);
 
+    const dealingStamp = (session.progress as any)?.dealingAt;
+  const lastStamp = useRef(dealingStamp);
+  const [watching, setWatching] = useState(false);
+  useEffect(() => {
+    if (!isNarrator && dealingStamp && dealingStamp !== lastStamp.current) {
+      setWatching(true);
+      window.setTimeout(() => setWatching(false), 1600);
+    }
+    lastStamp.current = dealingStamp;
+  }, [dealingStamp, isNarrator]);
+
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const distributed = Boolean(session.assignments);
   const assignedCharacter = useMemo(() => {
@@ -1331,6 +1342,7 @@ function Lobby({
     );
 
     setCounts(nextCounts);
+    onPatch({ progress: { dealingAt: Date.now() } as any });
     setDealing(true);
     window.setTimeout(() => {
       onPatch({ assignments });
@@ -2093,7 +2105,7 @@ function Lobby({
           )}
         </div>
       )}
-      {dealing && (
+            {(dealing || watching) && (
         <div className="dealing-overlay" role="status" aria-live="polite">
           <div className="dealing-stack" aria-hidden="true">
             <span />
