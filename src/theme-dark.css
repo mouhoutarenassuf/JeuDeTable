@@ -132,6 +132,11 @@ input:hover, textarea:hover, select:hover { border-color: #526c67; }
 .rules-detail-card > p:last-child, .equipment-card > p:last-child { margin: 18px 0 0; color: var(--muted); font-size: 14px; line-height: 1.8; white-space: pre-line; }
 .equipment-card { background: transparent; }
 .equipment-card h3 { font-size: 23px; }
+.game-guide { display: grid; grid-template-columns: 1.4fr .8fr; gap: 18px; margin-top: 54px; }
+.game-guide .guide-rules { grid-row: span 2; }
+.guide-card { padding: 27px; border: 1px solid var(--line); background: var(--ink-soft); }
+.guide-card h3 { margin: 5px 0 0; color: var(--cream); font-size: 21px; }
+.guide-card > p:last-child { margin: 15px 0 0; color: var(--muted); font-size: 13px; line-height: 1.75; white-space: pre-line; }
 
 .form-page { max-width: 820px; margin: auto; }
 .form-page > .detail-description { margin-bottom: 55px; }
@@ -156,6 +161,14 @@ input:hover, textarea:hover, select:hover { border-color: #526c67; }
 .three-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
 .remove-button { justify-self: start; background: none; border: 0; padding: 0; color: #bd6b68; cursor: pointer; font-size: 12px; }
 .save-button { width: 100%; margin-top: 10px; }
+.creation-preview { padding: 28px; border: 1px solid var(--gold); background: linear-gradient(145deg, #101d1d, var(--ink-soft)); }
+.creation-preview h3 { margin: 8px 0; color: var(--cream); font-size: 30px; }
+.creation-preview p { color: var(--muted); line-height: 1.6; }
+.creation-preview > strong { display: block; margin-top: 18px; color: var(--paper); line-height: 1.5; }
+.preview-facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.preview-facts span { padding: 6px 10px; border: 1px solid var(--line); color: var(--gold); font-size: 10px; font-weight: 700; }
+.save-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.form-error { padding: 14px 16px; border: 1px solid var(--red); background: #2b1a1a; color: #e5aaa7; }
 
 .lobby-page { max-width: 760px; margin: 55px auto; }
 .lobby-header { min-height: 220px; display: flex; justify-content: space-between; align-items: center; padding: 35px 45px; background: var(--ink-soft); border: 1px solid var(--line); }
@@ -287,6 +300,9 @@ input:hover, textarea:hover, select:hover { border-color: #526c67; }
 .role-illustration-seer { --role-accent: #316f82; }
 .role-illustration-witch { --role-accent: #52713c; }
 .role-illustration-cupid { --role-accent: #9d4057; }
+.role-illustration-protector { --role-accent: #3d7185; }
+.role-illustration-raven { --role-accent: #65528a; }
+.role-illustration-elder { --role-accent: #9b7638; }
 .secret-card.is-revealed .secret-front { visibility: visible; }
 .secret-card.is-revealed .secret-back { visibility: hidden; }
 .lobby-exit { margin-top: 25px; }
@@ -325,7 +341,8 @@ footer p { margin: 0; }
   .two-columns { grid-template-columns: 1fr; }
   .three-columns { grid-template-columns: 1fr; }
   .type-picker > div { grid-template-columns: repeat(2, 1fr); }
-  .rules-layout { grid-template-columns: 1fr; }
+  .rules-layout, .game-guide { grid-template-columns: 1fr; }
+  .game-guide .guide-rules { grid-row: auto; }
   .lobby-page { margin-top: 25px; }
   .lobby-header { padding: 25px; }
   .lobby-header .moon { display: none; }

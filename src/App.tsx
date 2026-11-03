@@ -127,8 +127,12 @@ type Game = {
   maxPlayers: number;
   duration: number;
   equipment: string;
+  objective?: string;
+  setup?: string;
   rules: string;
+  variations?: string;
   characters: Character[];
+  custom?: boolean;
 };
 
 type Progress = {
@@ -149,6 +153,11 @@ type Progress = {
   infected: string[];
   alphaTarget: string | null;
   alphaUsed: boolean;
+  protectorTarget: string | null;
+  lastProtected: string | null;
+  crowSelection: string | null;
+  crowTarget: string | null;
+  elderShieldUsed: boolean;
   counts: Record<number, number>;
 };
 
@@ -285,6 +294,30 @@ const defaultCharacters: Character[] = [
       "Une fois dans la partie, il peut transformer la victime des loups au lieu de l’éliminer.",
     ability: "Contamine un joueur une seule fois dans la partie.",
   },
+  {
+    id: 9,
+    name: "Salvateur",
+    camp: "village",
+    description:
+      "Chaque nuit, il protège un joueur de l’attaque des loups. Il ne peut pas protéger la même personne deux nuits de suite.",
+    ability: "Protège un joueur différent chaque nuit.",
+  },
+  {
+    id: 10,
+    name: "Corbeau",
+    camp: "village",
+    description:
+      "Chaque nuit, il désigne secrètement un joueur qui commencera la journée avec deux voix contre lui.",
+    ability: "Ajoute deux voix contre un joueur au prochain vote.",
+  },
+  {
+    id: 11,
+    name: "Ancien",
+    camp: "village",
+    description:
+      "Sa grande résistance lui permet de survivre à la première attaque des loups-garous.",
+    ability: "Résiste une fois à l’attaque des loups.",
+  },
 ];
 
 const initialGames: Game[] = [
@@ -298,8 +331,14 @@ const initialGames: Game[] = [
     maxPlayers: 24,
     duration: 30,
     equipment: "Une carte de rôle par joueur",
+    objective:
+      "Le village doit identifier et éliminer tous les loups-garous avant qu’ils ne deviennent majoritaires.",
+    setup:
+      "Choisissez les rôles, distribuez une identité secrète à chaque joueur et désignez un narrateur qui guidera les nuits.",
     rules:
       "Le village doit identifier et éliminer les loups-garous. La nuit, les rôles agissent en secret sous la conduite du narrateur. Le jour, tous les joueurs débattent puis votent.",
+    variations:
+      "Ajustez le nombre de loups et de rôles spéciaux selon la taille et l’expérience du groupe.",
     characters: defaultCharacters,
   },
   {
@@ -312,11 +351,83 @@ const initialGames: Game[] = [
     maxPlayers: 10,
     duration: 20,
     equipment: "Un paquet de 108 cartes Uno",
+    objective: "Être le premier joueur à ne plus avoir de carte en main.",
+    setup:
+      "Mélangez les cartes, distribuez-en 7 à chaque joueur puis retournez la première carte de la pioche.",
     rules:
       "Distribuez 7 cartes à chaque joueur et retournez la première carte de la pioche. À son tour, chacun pose une carte de même couleur, de même valeur ou de même symbole. Si aucune carte ne convient, il faut piocher. Annoncez « Uno » lorsqu’il ne vous reste qu’une carte. Le premier joueur sans carte remporte la manche.",
+    variations:
+      "Vous pouvez compter les points sur plusieurs manches ou jouer une partie rapide en une seule manche.",
     characters: [],
   },
 ];
+
+const CUSTOM_GAMES_KEY = "la-table-custom-games";
+const GAME_API_PATH = "/functions/v1/make-server-36f7c69f/games";
+
+function isGame(value: any): value is Game {
+  return (
+    value &&
+    typeof value.id === "number" &&
+    typeof value.name === "string" &&
+    typeof value.description === "string" &&
+    Object.hasOwn(gameTypes, value.type) &&
+    Array.isArray(value.characters)
+  );
+}
+
+function readCustomGames(): Game[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CUSTOM_GAMES_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter(isGame) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomGames(games: Game[]) {
+  try {
+    localStorage.setItem(
+      CUSTOM_GAMES_KEY,
+      JSON.stringify(games.filter((game) => game.custom)),
+    );
+  } catch {}
+}
+
+function mergeGames(...catalogs: Game[][]) {
+  const games = new Map<number, Game>();
+  catalogs.flat().forEach((game) => games.set(game.id, game));
+  return [...games.values()];
+}
+
+async function loadCommunityGames(): Promise<Game[]> {
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!baseUrl || !anonKey) return [];
+  const response = await fetch(`${baseUrl}${GAME_API_PATH}`, {
+    headers: { Authorization: `Bearer ${anonKey}` },
+  });
+  if (!response.ok) throw new Error("Catalogue distant indisponible.");
+  const data = await response.json();
+  return Array.isArray(data.games) ? data.games.filter(isGame) : [];
+}
+
+async function publishCommunityGame(game: Game, accessToken: string) {
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (!baseUrl) throw new Error("Supabase n’est pas configuré.");
+  const response = await fetch(`${baseUrl}${GAME_API_PATH}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(game),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || "Impossible de publier le jeu.");
+  }
+}
 
 function MoonMark({ small = false }: { small?: boolean }) {
   return <span className={small ? "moon moon-small" : "moon"} aria-hidden="true" />;
@@ -332,6 +443,9 @@ function RoleIllustration({ character }: { character: Character }) {
     : name.includes("chasseur") ? "hunter"
     : name.includes("cupid") ? "cupid"
     : name.includes("fille") ? "girl"
+    : name.includes("salvateur") ? "protector"
+    : name.includes("corbeau") ? "raven"
+    : name.includes("ancien") ? "elder"
     : name.includes("village") ? "villager"
     : character.camp === "loups" ? "wolf"
     : "mystery";
@@ -389,6 +503,29 @@ function RoleIllustration({ character }: { character: Character }) {
             <circle className="role-art-accent" cx="69" cy="84" r="4" />
             <circle className="role-art-accent" cx="91" cy="84" r="4" />
             <path d="M73 101c5 4 9 4 14 0M80 70v25" />
+          </>
+        )}
+        {kind === "protector" && (
+          <>
+            <path className="role-art-fill" d="M80 24 121 42v31c0 29-17 50-41 64-24-14-41-35-41-64V42l41-18Z" />
+            <path className="role-art-accent" d="M80 43 104 53v20c0 18-9 32-24 42-15-10-24-24-24-42V53l24-10Z" />
+            <path d="M80 51v55M60 77h40" />
+          </>
+        )}
+        {kind === "raven" && (
+          <>
+            <path className="role-art-fill" d="M30 99c29-10 40-42 60-61 9 14 22 24 40 29-13 7-21 17-25 31-21-8-42-7-75 1Z" />
+            <path d="M45 96c11 11 24 18 39 21M84 117l-5 17M94 114l8 16M89 42l-3-16M104 50l11-13" />
+            <circle className="role-art-accent" cx="103" cy="62" r="5" />
+            <path className="role-art-accent" d="m124 67 18 8-20 5" />
+          </>
+        )}
+        {kind === "elder" && (
+          <>
+            <circle className="role-art-fill" cx="80" cy="59" r="27" />
+            <path className="role-art-fill" d="M43 132c4-31 17-49 37-49s33 18 37 49H43Z" />
+            <path d="M59 53h13M88 53h13M65 67c9 8 21 8 30 0M80 82v50M54 105h52" />
+            <path className="role-art-accent" d="M72 32h16v19H72zM68 99h24v13H68z" />
           </>
         )}
         {kind === "villager" && (
@@ -815,7 +952,7 @@ function GameDetail({
           <span>{gameTypes[game.type].description}</span>
         </div>
       </div>
-      {roleGame ? (
+      {roleGame && (
         <>
           <div className="characters-heading">
             <div>
@@ -841,20 +978,29 @@ function GameDetail({
             ))}
           </div>
         </>
-      ) : (
-        <div className="rules-layout">
-          <article className="rules-detail-card">
-            <p className="eyebrow">Comment jouer</p>
-            <h2>Règles essentielles</h2>
-            <p>{game.rules}</p>
-          </article>
-          <aside className="equipment-card">
-            <p className="eyebrow">À préparer</p>
-            <h3>Matériel</h3>
-            <p>{game.equipment || "Aucun matériel particulier indiqué."}</p>
-          </aside>
-        </div>
       )}
+      <div className="game-guide">
+        <article className="rules-detail-card guide-rules">
+          <p className="eyebrow">But du jeu</p>
+          <h2>{game.objective || "Objectif de la partie"}</h2>
+          <p>{game.rules || "Les règles détaillées n’ont pas encore été ajoutées."}</p>
+        </article>
+        <aside className="equipment-card">
+          <p className="eyebrow">À préparer</p>
+          <h3>Matériel</h3>
+          <p>{game.equipment || "Aucun matériel particulier indiqué."}</p>
+        </aside>
+        <article className="guide-card">
+          <p className="eyebrow">Mise en place</p>
+          <h3>Avant de commencer</h3>
+          <p>{game.setup || "Préparez le matériel et installez les joueurs autour de la table."}</p>
+        </article>
+        <article className="guide-card">
+          <p className="eyebrow">Pour rejouer</p>
+          <h3>Variantes et conseils</h3>
+          <p>{game.variations || "Adaptez librement la durée et les règles à votre groupe."}</p>
+        </article>
+      </div>
     </section>
   );
 }
@@ -864,7 +1010,7 @@ function AddGame({
   onSave,
 }: {
   onCancel: () => void;
-  onSave: (game: Game) => void;
+  onSave: (game: Game) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -873,10 +1019,45 @@ function AddGame({
   const [maxPlayers, setMaxPlayers] = useState(6);
   const [duration, setDuration] = useState(30);
   const [equipment, setEquipment] = useState("");
+  const [objective, setObjective] = useState("");
+  const [setup, setSetup] = useState("");
   const [rules, setRules] = useState("");
+  const [variations, setVariations] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
   const [characters, setCharacters] = useState<Character[]>([
     { id: 1, name: "", camp: "village", description: "", ability: "" },
   ]);
+  const typeGuide: Record<
+    GameType,
+    { equipment: string; setup: string; rules: string }
+  > = {
+    roles: {
+      equipment: "Ex. cartes de rôles, jetons de vote, téléphone du narrateur",
+      setup: "Comment distribuer les rôles et préparer la première manche ?",
+      rules: "Décrivez les phases, les pouvoirs et les conditions de victoire.",
+    },
+    cartes: {
+      equipment: "Ex. paquet de 52 cartes, cartes spéciales, compteur de score",
+      setup: "Combien de cartes distribuer ? Où placer la pioche et la défausse ?",
+      rules: "Expliquez ce qu’un joueur peut faire à son tour et comment gagner.",
+    },
+    plateau: {
+      equipment: "Ex. plateau, pions, dés, tuiles et marqueurs",
+      setup: "Où placer le plateau, les pions et les ressources de départ ?",
+      rules: "Décrivez un tour, les déplacements, les actions et la fin de partie.",
+    },
+    ambiance: {
+      equipment: "Ex. cartes de défis, minuteur, papier et crayons",
+      setup: "Comment former les équipes et lancer la première épreuve ?",
+      rules: "Expliquez les défis, le score et le rythme des manches.",
+    },
+    autre: {
+      equipment: "Listez tout ce qu’il faut pour jouer",
+      setup: "Expliquez comment installer et commencer la partie.",
+      rules: "Décrivez le déroulement de façon simple, étape par étape.",
+    },
+  };
 
   function update(id: number, changes: Partial<Character>) {
     setCharacters((items) =>
@@ -884,23 +1065,42 @@ function AddGame({
     );
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    onSave({
-      id: Date.now(),
-      name,
-      description,
-      type,
-      minPlayers,
-      maxPlayers: Math.max(minPlayers, maxPlayers),
-      duration,
-      equipment,
-      rules,
-      characters:
-        type === "roles"
-          ? characters.filter((character) => character.name.trim())
-          : [],
-    });
+    setMessage("");
+    const validCharacters = characters.filter((character) =>
+      character.name.trim(),
+    );
+    if (type === "roles" && validCharacters.length === 0) {
+      setMessage("Ajoutez au moins un personnage à votre jeu de rôles.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave({
+        id: Date.now(),
+        name: name.trim(),
+        description: description.trim(),
+        type,
+        minPlayers,
+        maxPlayers: Math.max(minPlayers, maxPlayers),
+        duration,
+        equipment: equipment.trim(),
+        objective: objective.trim(),
+        setup: setup.trim(),
+        rules: rules.trim(),
+        variations: variations.trim(),
+        characters: type === "roles" ? validCharacters : [],
+        custom: true,
+      });
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Impossible d’enregistrer le jeu.",
+      );
+      setSaving(false);
+    }
   }
 
   return (
@@ -1045,6 +1245,16 @@ function AddGame({
                         }
                       />
                     </label>
+                    <label>
+                      Pouvoir ou particularité
+                      <input
+                        value={character.ability}
+                        onChange={(event) =>
+                          update(character.id, { ability: event.target.value })
+                        }
+                        placeholder="Ex. protège un joueur chaque nuit"
+                      />
+                    </label>
                     {characters.length > 1 && (
                       <button
                         className="remove-button"
@@ -1078,6 +1288,24 @@ function AddGame({
                 >
                   + Ajouter un personnage
                 </button>
+                <label>
+                  Matériel nécessaire
+                  <input
+                    value={equipment}
+                    onChange={(event) => setEquipment(event.target.value)}
+                    placeholder={typeGuide[type].equipment}
+                  />
+                </label>
+                <label>
+                  Règles essentielles
+                  <textarea
+                    rows={7}
+                    value={rules}
+                    onChange={(event) => setRules(event.target.value)}
+                    placeholder={typeGuide[type].rules}
+                    required
+                  />
+                </label>
               </>
             ) : (
               <>
@@ -1091,7 +1319,7 @@ function AddGame({
                   <input
                     value={equipment}
                     onChange={(event) => setEquipment(event.target.value)}
-                    placeholder="Ex. un paquet de cartes, 4 pions et un dé"
+                    placeholder={typeGuide[type].equipment}
                   />
                 </label>
                 <label>
@@ -1100,7 +1328,7 @@ function AddGame({
                     rows={7}
                     value={rules}
                     onChange={(event) => setRules(event.target.value)}
-                    placeholder="Décrivez la mise en place, le déroulement d’un tour et la condition de victoire..."
+                    placeholder={typeGuide[type].rules}
                     required
                   />
                 </label>
@@ -1108,8 +1336,81 @@ function AddGame({
             )}
           </div>
         </div>
-        <button className="primary-button save-button" type="submit">
-          Ajouter le jeu
+        <div className="form-section">
+          <span className="form-section-number">03</span>
+          <div className="form-section-content">
+            <h2>Guide de la partie</h2>
+            <p className="section-help">
+              Ces informations rendent la fiche utilisable pour n’importe quel
+              groupe, même sans connaître le jeu.
+            </p>
+            <label>
+              Objectif principal
+              <textarea
+                rows={3}
+                value={objective}
+                onChange={(event) => setObjective(event.target.value)}
+                placeholder="Que faut-il accomplir pour gagner ?"
+                required
+              />
+            </label>
+            <label>
+              Mise en place
+              <textarea
+                rows={4}
+                value={setup}
+                onChange={(event) => setSetup(event.target.value)}
+                placeholder={typeGuide[type].setup}
+              />
+            </label>
+            <label>
+              Variantes, conseils ou règles maison
+              <textarea
+                rows={3}
+                value={variations}
+                onChange={(event) => setVariations(event.target.value)}
+                placeholder="Optionnel : partie courte, équipes, difficulté, règles maison..."
+              />
+            </label>
+          </div>
+        </div>
+        <div className="form-section">
+          <span className="form-section-number">04</span>
+          <div className="form-section-content">
+            <h2>Aperçu avant publication</h2>
+            <div className="creation-preview">
+              <span className="card-kicker">{gameTypes[type].label}</span>
+              <h3>{name.trim() || "Nom de votre jeu"}</h3>
+              <p>
+                {description.trim() ||
+                  "La description apparaîtra ici pour présenter rapidement la partie."}
+              </p>
+              <div className="preview-facts">
+                <span>{minPlayers}–{Math.max(minPlayers, maxPlayers)} joueurs</span>
+                <span>{duration} min</span>
+                {type === "roles" && (
+                  <span>
+                    {characters.filter((character) => character.name.trim()).length} rôle(s)
+                  </span>
+                )}
+              </div>
+              <strong>
+                {objective.trim() || "Ajoutez l’objectif principal du jeu."}
+              </strong>
+            </div>
+            <p className="save-note">
+              Le jeu est toujours conservé sur cet appareil. Si vous êtes
+              connecté, il est aussi publié dans le catalogue partagé.
+            </p>
+          </div>
+        </div>
+        {message && <p className="form-message form-error">{message}</p>}
+        <button
+          className="primary-button save-button"
+          type="submit"
+          disabled={saving}
+        >
+          {saving ? "Enregistrement…" : "Ajouter le jeu au catalogue"}
         </button>
       </form>
     </section>
@@ -1180,6 +1481,21 @@ function Lobby({
     saved?.alphaTarget ?? null,
   );
   const [alphaUsed, setAlphaUsed] = useState(saved?.alphaUsed ?? false);
+  const [protectorTarget, setProtectorTarget] = useState<string | null>(
+    saved?.protectorTarget ?? null,
+  );
+  const [lastProtected, setLastProtected] = useState<string | null>(
+    saved?.lastProtected ?? null,
+  );
+  const [crowSelection, setCrowSelection] = useState<string | null>(
+    saved?.crowSelection ?? null,
+  );
+  const [crowTarget, setCrowTarget] = useState<string | null>(
+    saved?.crowTarget ?? null,
+  );
+  const [elderShieldUsed, setElderShieldUsed] = useState(
+    saved?.elderShieldUsed ?? false,
+  );
 
   const deviceKey = getDeviceKey();
   const isNarrator =
@@ -1257,6 +1573,11 @@ function Lobby({
       infected,
       alphaTarget,
       alphaUsed,
+      protectorTarget,
+      lastProtected,
+      crowSelection,
+      crowTarget,
+      elderShieldUsed,
       counts,
     };
   }
@@ -1280,6 +1601,11 @@ function Lobby({
     setInfected(p?.infected ?? []);
     setAlphaTarget(p?.alphaTarget ?? null);
     setAlphaUsed(p?.alphaUsed ?? false);
+    setProtectorTarget(p?.protectorTarget ?? null);
+    setLastProtected(p?.lastProtected ?? null);
+    setCrowSelection(p?.crowSelection ?? null);
+    setCrowTarget(p?.crowTarget ?? null);
+    setElderShieldUsed(p?.elderShieldUsed ?? false);
   }
 
   const wasNarrator = useRef(isNarrator);
@@ -1316,6 +1642,11 @@ function Lobby({
     infected,
     alphaTarget,
     alphaUsed,
+    protectorTarget,
+    lastProtected,
+    crowSelection,
+    crowTarget,
+    elderShieldUsed,
     counts,
   ]);
 
@@ -1338,6 +1669,10 @@ function Lobby({
     setLovers((items) => items.filter((item) => item !== name));
     setInfected((items) => items.filter((item) => item !== name));
     setCupidSelection((items) => items.filter((item) => item !== name));
+    setProtectorTarget((item) => (item === name ? null : item));
+    setLastProtected((item) => (item === name ? null : item));
+    setCrowSelection((item) => (item === name ? null : item));
+    setCrowTarget((item) => (item === name ? null : item));
   }
 
   function transferHost(name: string) {
@@ -1392,7 +1727,7 @@ function Lobby({
     const specialCount = Math.min(
       specials.length,
       Math.max(0, session.players.length - deck.length - 1),
-      3,
+      Math.max(3, Math.floor(session.players.length / 2)),
     );
     deck.push(...specials.slice(0, specialCount));
     while (deck.length < session.players.length) deck.push(villagers);
@@ -1453,6 +1788,11 @@ function Lobby({
       setInfected([]);
       setAlphaTarget(null);
       setAlphaUsed(false);
+      setProtectorTarget(null);
+      setLastProtected(null);
+      setCrowSelection(null);
+      setCrowTarget(null);
+      setElderShieldUsed(false);
     }, 1500);
   }
 
@@ -1468,12 +1808,30 @@ function Lobby({
     setWitchSave(false);
     setWitchPoison(null);
     setAlphaTarget(null);
+    setProtectorTarget(null);
+    setCrowSelection(null);
     setCompletedSteps([]);
   }
 
   function resolveNight() {
     const deaths = new Set<string>();
-    if (wolfVictim && !witchSave && !alphaTarget) deaths.add(wolfVictim);
+    let elderSurvived = false;
+    if (
+      wolfVictim &&
+      !witchSave &&
+      !alphaTarget &&
+      wolfVictim !== protectorTarget
+    ) {
+      const victimRole = assignedPlayers.find(
+        ({ name }) => name === wolfVictim,
+      )?.character.name;
+      if (victimRole === "Ancien" && !elderShieldUsed) {
+        elderSurvived = true;
+        setElderShieldUsed(true);
+      } else {
+        deaths.add(wolfVictim);
+      }
+    }
     if (witchPoison) deaths.add(witchPoison);
     if (lovers.length === 2 && lovers.some((name) => deaths.has(name))) {
       lovers.forEach((name) => deaths.add(name));
@@ -1490,7 +1848,11 @@ function Lobby({
       ]);
     } else {
       setHistory((items) => [
-        `Personne n’est éliminé pendant la nuit ${round}.`,
+        elderSurvived
+          ? `L’Ancien résiste à la première attaque des loups pendant la nuit ${round}.`
+          : protectorTarget === wolfVictim && wolfVictim
+            ? `${protectorTarget} a été protégé de l’attaque des loups pendant la nuit ${round}.`
+            : `Personne n’est éliminé pendant la nuit ${round}.`,
         ...items,
       ]);
     }
@@ -1505,6 +1867,8 @@ function Lobby({
     }
     if (witchSave) setWitchLifeUsed(true);
     if (witchPoison) setWitchPoisonUsed(true);
+    if (protectorTarget) setLastProtected(protectorTarget);
+    setCrowTarget(crowSelection);
 
     setPhase("day");
     setHistory((items) => [`Le village se réveille au jour ${round}.`, ...items]);
@@ -1524,6 +1888,7 @@ function Lobby({
     }
     setRound((current) => current + 1);
     setPhase("night");
+    setCrowTarget(null);
     setHistory((items) => [`La nuit ${round + 1} commence.`, ...items]);
     resetNightActions();
   }
@@ -1583,7 +1948,7 @@ function Lobby({
     night: {
       label: `Nuit ${round}`,
       title: "Le village s’endort",
-      text: "Demandez à tous de fermer les yeux. Appelez les rôles dans l’ordre : Cupidon à la première nuit, Voyante, Loups-garous, puis Sorcière.",
+      text: "Demandez à tous de fermer les yeux. Appelez les rôles dans l’ordre indiqué, puis résolvez leurs actions avant le réveil.",
       action: "Réveiller le village et résoudre la nuit",
     },
     day: {
@@ -1604,6 +1969,9 @@ function Lobby({
     ...(activeRoleNames.has("Voyante")
       ? [{ id: "Voyante", label: "Réveiller la Voyante", detail: "Voir un rôle" }]
       : []),
+    ...(activeRoleNames.has("Salvateur")
+      ? [{ id: "Salvateur", label: "Réveiller le Salvateur", detail: "Protéger un joueur" }]
+      : []),
     ...(aliveWolves > 0
       ? [{ id: "Loups", label: "Réveiller les Loups", detail: "Choisir une victime" }]
       : []),
@@ -1612,6 +1980,9 @@ function Lobby({
       : []),
     ...(activeRoleNames.has("Sorcière")
       ? [{ id: "Sorcière", label: "Réveiller la Sorcière", detail: "Sauver ou empoisonner" }]
+      : []),
+    ...(activeRoleNames.has("Corbeau")
+      ? [{ id: "Corbeau", label: "Réveiller le Corbeau", detail: "Ajouter deux voix" }]
       : []),
   ];
   const phaseSteps =
@@ -1820,6 +2191,10 @@ function Lobby({
                     <div className="player-badges">
                       {lovers.includes(name) && <span>Amoureux</span>}
                       {infected.includes(name) && <span>Contaminé</span>}
+                      {crowTarget === name && <span>Accusé · +2 voix</span>}
+                      {character.name === "Ancien" && elderShieldUsed && (
+                        <span>Résistance utilisée</span>
+                      )}
                     </div>
                     <span className="role-symbol" aria-hidden="true">
                       {character.camp === "loups" ? "L" : character.name[0]}
@@ -1949,6 +2324,42 @@ function Lobby({
                       </div>
                     )}
 
+                    {awakeRole === "Salvateur" && (
+                      <div className="role-action">
+                        <span className="phase-label">Action du Salvateur</span>
+                        <h3>Protéger un joueur</h3>
+                        <p>
+                          La cible survivra à l’attaque des loups cette nuit. La
+                          personne protégée la nuit précédente n’est pas disponible.
+                        </p>
+                        <div className="player-picker">
+                          {alivePlayers.map(({ name }) => (
+                            <button
+                              className={protectorTarget === name ? "is-selected" : ""}
+                              disabled={lastProtected === name}
+                              key={name}
+                              onClick={() => setProtectorTarget(name)}
+                            >
+                              {name}
+                              {lastProtected === name ? " · protégé la nuit précédente" : ""}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          className="secondary-button role-confirm"
+                          disabled={!protectorTarget}
+                          onClick={() => {
+                            setCompletedSteps((items) => [
+                              ...new Set([...items, "Salvateur"]),
+                            ]);
+                            setAwakeRole(null);
+                          }}
+                        >
+                          Confirmer la protection
+                        </button>
+                      </div>
+                    )}
+
                     {awakeRole === "Loups" && (
                       <div className="role-action">
                         <span className="phase-label">Action des Loups-garous</span>
@@ -2068,6 +2479,40 @@ function Lobby({
                           }}
                         >
                           Rendormir la Sorcière
+                        </button>
+                      </div>
+                    )}
+
+                    {awakeRole === "Corbeau" && (
+                      <div className="role-action">
+                        <span className="phase-label">Action du Corbeau</span>
+                        <h3>Désigner un joueur</h3>
+                        <p>
+                          Ce joueur commencera le prochain vote avec deux voix
+                          contre lui. Le narrateur verra un rappel pendant la journée.
+                        </p>
+                        <div className="player-picker">
+                          {alivePlayers.map(({ name }) => (
+                            <button
+                              className={crowSelection === name ? "is-danger" : ""}
+                              key={name}
+                              onClick={() => setCrowSelection(name)}
+                            >
+                              {name}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          className="secondary-button role-confirm"
+                          disabled={!crowSelection}
+                          onClick={() => {
+                            setCompletedSteps((items) => [
+                              ...new Set([...items, "Corbeau"]),
+                            ]);
+                            setAwakeRole(null);
+                          }}
+                        >
+                          Confirmer l’accusation
                         </button>
                       </div>
                     )}
@@ -2394,7 +2839,9 @@ function AuthPage({
 }
 
 export default function App() {
-  const [games, setGames] = useState(initialGames);
+  const [games, setGames] = useState(() =>
+    mergeGames(initialGames, readCustomGames()),
+  );
   const [page, setPage] = useState<Page>({ name: "home" });
     const [theme, setTheme] = useState<Theme>(readTheme);
   function changeTheme(next: Theme) {
@@ -2413,6 +2860,18 @@ export default function App() {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    loadCommunityGames()
+      .then((communityGames) => {
+        setGames((current) =>
+          mergeGames(initialGames, communityGames, current),
+        );
+      })
+      .catch((error) => {
+        console.warn("Catalogue partagé indisponible :", error);
+      });
   }, []);
 
     useEffect(() => {
@@ -2620,9 +3079,33 @@ export default function App() {
         {page.name === "add" && (
           <AddGame
             onCancel={() => setPage({ name: "home" })}
-            onSave={(game) => {
-              setGames((items) => [...items, game]);
+            onSave={async (game) => {
+              const { data } = await supabase.auth.getSession();
+              let publicationError = "";
+              if (data.session?.access_token) {
+                try {
+                  await publishCommunityGame(
+                    game,
+                    data.session.access_token,
+                  );
+                } catch (error) {
+                  publicationError =
+                    error instanceof Error
+                      ? error.message
+                      : "Publication distante impossible.";
+                }
+              }
+              setGames((items) => {
+                const next = mergeGames(items, [game]);
+                saveCustomGames(next);
+                return next;
+              });
               setPage({ name: "game", id: game.id });
+              if (publicationError) {
+                window.alert(
+                  `${publicationError} Le jeu reste enregistré sur cet appareil.`,
+                );
+              }
             }}
           />
         )}
