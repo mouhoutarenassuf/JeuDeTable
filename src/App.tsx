@@ -1100,17 +1100,17 @@ function Lobby({
   const wasRemoved =
     !isNarrator && !host && !!player && !session.players.includes(player);
 
-    const dealingStamp = (session.progress as any)?.dealingAt;
-  const lastStamp = useRef(dealingStamp);
+      const hasCards = Boolean(session.assignments);
+  const hadCards = useRef(hasCards);
   const [watching, setWatching] = useState(false);
   useEffect(() => {
-    if (!isNarrator && dealingStamp && dealingStamp !== lastStamp.current) {
+    if (!isNarrator && hasCards && !hadCards.current) {
       setWatching(true);
-      window.setTimeout(() => setWatching(false), 1600);
+      window.setTimeout(() => setWatching(false), 2200);
     }
-    lastStamp.current = dealingStamp;
-  }, [dealingStamp, isNarrator]);
-
+    hadCards.current = hasCards;
+  }, [hasCards, isNarrator]);
+  
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const distributed = Boolean(session.assignments);
   const assignedCharacter = useMemo(() => {
