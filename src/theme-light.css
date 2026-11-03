@@ -334,13 +334,21 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); box-sh
 .waiting-card .moon { width: 70px; height: 70px; margin: 0 auto 26px; }
 .waiting-card h2 { color: var(--ink); }
 .secret-card { position: relative; width: 290px; aspect-ratio: 2/3; padding: 0; background: transparent; border: 0; cursor: pointer; }
-.secret-back, .secret-front { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 30px; border-radius: 24px; box-shadow: var(--shadow-lift); }
+.secret-back, .secret-front { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 13px; padding: 24px; border-radius: 24px; box-shadow: var(--shadow-lift); }
 .secret-back { --moon-bg: #fff; border: 2px dashed #c7c3fb; background: #fff; color: var(--muted); font-weight: 600; }
 .secret-back .moon { width: 85px; height: 85px; }
 .secret-front { visibility: hidden; background: var(--primary); color: #fff; }
 .secret-front strong { font: 700 30px var(--serif); }
-.secret-front small { line-height: 1.6; color: #e1defd; }
+.secret-front small { line-height: 1.45; color: #e1defd; }
 .secret-front .camp-tag { background: rgba(255, 255, 255, .2); color: #fff; }
+.role-illustration { display: grid; place-items: center; width: 148px; height: 148px; flex: none; border: 1px solid rgba(255, 255, 255, .25); border-radius: 50%; background: rgba(15, 10, 67, .17); color: #fff; --role-accent: #f6c96f; }
+.role-illustration svg { width: 126px; height: 126px; overflow: visible; stroke: currentColor; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.role-illustration .role-art-fill { fill: rgba(255, 255, 255, .1); }
+.role-illustration .role-art-accent { fill: var(--role-accent); stroke: var(--role-accent); }
+.role-illustration-wolf, .role-illustration-alpha { --role-accent: #ffb58f; }
+.role-illustration-seer { --role-accent: #9fe7ff; }
+.role-illustration-witch { --role-accent: #c7ef91; }
+.role-illustration-cupid { --role-accent: #ff9db0; }
 .secret-card.is-revealed .secret-front { visibility: visible; }
 .secret-card.is-revealed .secret-back { visibility: hidden; }
 .lobby-exit { margin-top: 25px; }

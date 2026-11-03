@@ -322,6 +322,95 @@ function MoonMark({ small = false }: { small?: boolean }) {
   return <span className={small ? "moon moon-small" : "moon"} aria-hidden="true" />;
 }
 
+function RoleIllustration({ character }: { character: Character }) {
+  const name = character.name.toLocaleLowerCase("fr");
+  const kind =
+    name.includes("alpha") ? "alpha"
+    : name.includes("loup") ? "wolf"
+    : name.includes("voyante") ? "seer"
+    : name.includes("sorci") ? "witch"
+    : name.includes("chasseur") ? "hunter"
+    : name.includes("cupid") ? "cupid"
+    : name.includes("fille") ? "girl"
+    : name.includes("village") ? "villager"
+    : character.camp === "loups" ? "wolf"
+    : "mystery";
+
+  return (
+    <span className={`role-illustration role-illustration-${kind}`} aria-hidden="true">
+      <svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {kind === "wolf" && (
+          <>
+            <path className="role-art-fill" d="M38 48 58 60h44l20-12-7 35c0 31-16 53-35 53S45 114 45 83l-7-35Z" />
+            <path d="m45 73 16-16M115 73 99 57M58 88l10 5M102 88l-10 5M70 112l10 6 10-6M80 118v10" />
+            <path className="role-art-accent" d="M66 83c0 4-3 7-7 7s-7-3-7-7c4-3 10-3 14 0ZM108 83c0 4-3 7-7 7s-7-3-7-7c4-3 10-3 14 0Z" />
+          </>
+        )}
+        {kind === "alpha" && (
+          <>
+            <path className="role-art-accent" d="m53 48 10-21 17 17 17-17 10 21-8 10H61l-8-10Z" />
+            <path className="role-art-fill" d="m39 56 20 9h42l20-9-7 31c0 29-15 49-34 49S46 116 46 87l-7-31Z" />
+            <path d="m48 77 14-13M112 77 98 64M67 91l-11-5M93 91l11-5M68 113l12 6 12-6M80 119v9" />
+          </>
+        )}
+        {kind === "seer" && (
+          <>
+            <circle className="role-art-fill" cx="80" cy="76" r="43" />
+            <path className="role-art-accent" d="M59 77c12-16 30-16 42 0-12 16-30 16-42 0Z" />
+            <circle cx="80" cy="77" r="9" />
+            <path d="M54 124h52M62 107h36l8 17H54l8-17Z" />
+          </>
+        )}
+        {kind === "witch" && (
+          <>
+            <path className="role-art-fill" d="m44 69 36-44 31 44H44Z" />
+            <path d="M31 72h95M58 69l19-24 12 24M54 108c0-19 12-33 26-33s26 14 26 33v21H54v-21Z" />
+            <path className="role-art-accent" d="M101 106h24v25h-24zM106 98h14v8h-14z" />
+            <path d="m107 118 5 5 8-11" />
+          </>
+        )}
+        {kind === "hunter" && (
+          <>
+            <path className="role-art-fill" d="M47 31c-18 26-18 72 0 98M47 31c26 18 26 80 0 98" />
+            <path d="M47 80h70M101 65l16 15-16 15M36 80h19" />
+            <path className="role-art-accent" d="M31 72h16v16H31z" />
+          </>
+        )}
+        {kind === "cupid" && (
+          <>
+            <path className="role-art-fill" d="M80 130C66 112 35 94 35 62c0-17 11-28 27-28 9 0 15 5 18 12 3-7 9-12 18-12 16 0 27 11 27 28 0 32-31 50-45 68Z" />
+            <path className="role-art-accent" d="m29 121 96-82M105 36l20 3-3 20M36 101l-7 20 20-3" />
+          </>
+        )}
+        {kind === "girl" && (
+          <>
+            <path className="role-art-fill" d="M40 127c5-37 20-57 40-57s35 20 40 57H40Z" />
+            <path d="M54 75c0-27 11-44 26-44s26 17 26 44M60 67c8 8 32 8 40 0" />
+            <circle className="role-art-accent" cx="69" cy="84" r="4" />
+            <circle className="role-art-accent" cx="91" cy="84" r="4" />
+            <path d="M73 101c5 4 9 4 14 0M80 70v25" />
+          </>
+        )}
+        {kind === "villager" && (
+          <>
+            <circle className="role-art-fill" cx="80" cy="58" r="25" />
+            <path className="role-art-fill" d="M39 130c3-32 18-50 41-50s38 18 41 50H39Z" />
+            <path d="M57 51h46M65 34v17M95 34v17M55 95l25 19 25-19" />
+            <path className="role-art-accent" d="M72 114h16v16H72z" />
+          </>
+        )}
+        {kind === "mystery" && (
+          <>
+            <path className="role-art-fill" d="M47 26h66a10 10 0 0 1 10 10v88a10 10 0 0 1-10 10H47a10 10 0 0 1-10-10V36a10 10 0 0 1 10-10Z" />
+            <path className="role-art-accent" d="M65 64c2-10 8-15 17-15 10 0 17 6 17 15 0 15-19 15-19 29" />
+            <circle cx="80" cy="111" r="4" />
+          </>
+        )}
+      </svg>
+    </span>
+  );
+}
+
 function Header({
   onHome,
   onAdd,
@@ -2073,6 +2162,7 @@ function Lobby({
                 <span className={`camp-tag camp-${assignedCharacter.camp}`}>
                   {campNames[assignedCharacter.camp]}
                 </span>
+                <RoleIllustration character={assignedCharacter} />
                 <strong>{assignedCharacter.name}</strong>
                 <small>{assignedCharacter.description}</small>
               </span>
