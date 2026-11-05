@@ -376,3 +376,101 @@ footer p { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* Adaptation téléphones et tablettes */
+html { -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.app-shell { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+@media (hover: none) { .game-card:hover, .primary-button:hover { transform: none; } }
+
+@media (min-width: 520px) and (max-width: 900px) {
+  .characters-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  main { padding: 0 16px calc(70px + env(safe-area-inset-bottom, 0px)); }
+  input, textarea, select { font-size: 16px; }
+  .primary-button, .secondary-button { min-height: 48px; }
+
+  .site-header { height: auto; min-height: 64px; padding: 10px 14px; gap: 8px; flex-wrap: nowrap; }
+  .brand { font-size: 19px; gap: 8px; white-space: nowrap; flex: none; }
+  .header-actions { gap: 6px; flex: none; }
+  .add-pill { padding: 5px; }
+  .add-pill-text { display: none; }
+  .add-pill-icon { width: 36px; height: 36px; }
+  .theme-toggle { padding: 3px; }
+  .theme-toggle button { width: 34px; height: 34px; }
+  .header-actions .primary-button { min-height: 38px !important; font-size: 13px !important; white-space: nowrap; }
+
+  h1 { font-size: clamp(36px, 11vw, 48px); }
+  .hero { min-height: auto; gap: 8px; padding-top: 6px; }
+  .hero-copy { padding: 20px 0 10px; }
+  .hero-copy > p:last-child { font-size: 16px; margin-top: 16px; }
+  .hero-art { height: 200px; }
+  .hero-art .moon { width: 80px; height: 80px; top: 28px; right: 50px; }
+
+  .join-card { margin: 28px 0; padding: 24px 18px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  .section-intro h2, .characters-heading h2 { font-size: 24px; }
+  .join-form { gap: 14px; }
+  .join-form .primary-button { width: 100%; }
+  .catalog { margin-top: 44px; }
+
+  .game-card { grid-template-columns: 1fr; min-height: 0; }
+  .game-visual { min-height: 140px; }
+  .game-card-content { padding: 22px; min-height: 0; }
+  .game-card h3 { font-size: 26px; }
+
+  .detail-hero { min-height: auto; padding-bottom: 36px; }
+  .start-button { width: 100%; min-width: 0; }
+  .characters-heading { margin: 40px 0 18px; }
+  .character-card { min-height: 0; padding: 20px; }
+  .rules-detail-card, .equipment-card { padding: 22px; }
+
+  .form-section { grid-template-columns: 1fr; padding: 26px 0 32px; }
+  .form-section-number { margin-bottom: 10px; }
+  .form-page h1 { font-size: 38px; }
+  .type-picker > div { grid-template-columns: 1fr 1fr; }
+  .type-picker label { min-height: 100px; }
+  .character-form { padding: 16px; }
+
+  .lobby-page { margin: 12px auto; }
+  .lobby-header { padding: 22px; min-height: 150px; }
+  .lobby-code { font-size: clamp(34px, 13vw, 48px); letter-spacing: .1em; }
+  .lobby-section { padding: 24px 0; }
+  .player-list li { grid-template-columns: 36px 1fr auto; padding: 8px 0; }
+  .player-list li small { display: none; }
+  .composition-row { padding: 8px 0; }
+  .counter button { width: 40px; height: 40px; }
+  .game-status strong { font-size: 22px; }
+  .dealt-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dealt-card { min-height: 170px; padding: 14px; }
+  .player-state-button { padding: 10px 14px; }
+  .phase-card { padding: 22px; }
+  .phase-card h2 { font-size: 24px; }
+  .phase-card .primary-button, .role-confirm { width: 100%; }
+  .role-action { padding: 16px; }
+  .player-picker button, .potion-button { padding: 12px 16px; }
+  .wake-list > button { padding: 14px; }
+  .rules-card { grid-template-columns: 1fr; gap: 10px; padding: 18px; }
+  .victory-banner { padding: 24px; }
+  .victory-banner h2 { font-size: 25px; }
+  .secret-card { width: min(78vw, 300px); }
+  .waiting-card { padding: 28px 20px; }
+  .dealing-overlay strong { font-size: 21px; }
+  .back-link { padding: 10px 0; margin: 14px 0; }
+  .text-button { padding: 12px 0; }
+  footer { flex-direction: column; align-items: flex-start; gap: 6px; padding: 24px 0; }
+}
+
+@media (max-width: 400px) {
+  .brand span { display: none; }
+  .hero-art { height: 170px; }
+  .dealt-grid { grid-template-columns: 1fr; }
+  .type-picker > div { grid-template-columns: 1fr; }
+}
+
+@media (max-height: 480px) and (orientation: landscape) {
+  .hero { min-height: auto; }
+  .secret-card { width: 200px; }
+}
